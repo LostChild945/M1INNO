@@ -90,21 +90,19 @@ services:
   # Apache Spark — Master
   # ─────────────────────────────────────────────
   spark-master:
-    image: bitnami/spark:3.5
+    image: apache/spark:3.5.3
     container_name: agritech-spark-master
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
     environment:
-      SPARK_MODE: master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
-      SPARK_MASTER_WEBUI_PORT: 8080
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: "7077"
+      SPARK_MASTER_WEBUI_PORT: "8080"
     ports:
       - "8080:8080"   # Spark UI
       - "7077:7077"   # Spark master port
     volumes:
-      - ./src:/opt/bitnami/spark/src
-      - ./data:/opt/bitnami/spark/data
+      - ./src:/opt/spark/work-dir/src
+      - ./data:/opt/spark/work-dir/data
     networks:
       - agritech-net
 
@@ -112,20 +110,15 @@ services:
   # Apache Spark — Worker
   # ─────────────────────────────────────────────
   spark-worker:
-    image: bitnami/spark:3.5
+    image: apache/spark:3.5.3
     container_name: agritech-spark-worker
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     environment:
-      SPARK_MODE: worker
-      SPARK_MASTER_URL: spark://spark-master:7077
-      SPARK_WORKER_MEMORY: 6G
-      SPARK_WORKER_CORES: 4
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
+      SPARK_WORKER_MEMORY: 6g
+      SPARK_WORKER_CORES: "4"
     volumes:
-      - ./src:/opt/bitnami/spark/src
-      - ./data:/opt/bitnami/spark/data
+      - ./src:/opt/spark/work-dir/src
+      - ./data:/opt/spark/work-dir/data
     depends_on:
       - spark-master
     networks:
