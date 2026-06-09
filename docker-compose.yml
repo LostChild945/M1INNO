@@ -128,7 +128,9 @@ services:
   # MLflow — tracking server
   # ─────────────────────────────────────────────
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.14.3
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.mlflow
     container_name: agritech-mlflow
     command: >
       mlflow server
