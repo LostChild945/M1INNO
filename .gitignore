@@ -12,5 +12,6 @@ build/
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
+!data/raw/pesticides.csv
 !data/processed/.gitkeep
 mlflow-artifacts/
