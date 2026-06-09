@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS parcels (
     latitude    FLOAT        NOT NULL,
     longitude   FLOAT        NOT NULL,
     soil_type   VARCHAR(50),
+    country     VARCHAR(150),
     created_at  TIMESTAMP DEFAULT NOW()
 );
 
