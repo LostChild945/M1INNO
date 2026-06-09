@@ -16,10 +16,9 @@ Lancement :
   python3 src/ml/train_xgboost.py
 """
 import os
-import json
 import numpy as np
 import pandas as pd
-import psycopg2
+import sqlalchemy
 import mlflow
 import mlflow.xgboost
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -27,11 +26,9 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import xgboost as xgb
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://agritech:agritech_secret@localhost:5432/agritech",
-)
-MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+DATABASE_URL   = os.getenv("DATABASE_URL", "postgresql://agritech:agritech_secret@localhost:5432/agritech")
+MLFLOW_URI     = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+ARTIFACT_ROOT  = os.getenv("MLFLOW_ARTIFACT_ROOT", "/tmp/mlflow-artifacts")
 
 PARAMS = {
     "n_estimators":     300,
@@ -46,7 +43,7 @@ PARAMS = {
 }
 
 
-def load_dataset(conn) -> pd.DataFrame:
+def load_dataset(engine) -> pd.DataFrame:
     query = """
         SELECT
             p.crop_type,
@@ -74,7 +71,8 @@ def load_dataset(conn) -> pd.DataFrame:
             AND pu.year = EXTRACT(YEAR FROM s.recorded_at)::INT
         WHERE y.yield_t_per_ha IS NOT NULL
     """
-    return pd.read_sql(query, conn)
+    with engine.connect() as conn:
+        return pd.read_sql(sqlalchemy.text(query), conn)
 
 
 def build_features(df: pd.DataFrame):
@@ -94,12 +92,21 @@ def build_features(df: pd.DataFrame):
 
 
 def main():
+    os.makedirs(ARTIFACT_ROOT, exist_ok=True)
     mlflow.set_tracking_uri(MLFLOW_URI)
+
+    client = mlflow.MlflowClient()
+    exp = client.get_experiment_by_name("yield-prediction-xgboost")
+    if exp is None:
+        client.create_experiment(
+            "yield-prediction-xgboost",
+            artifact_location=f"file://{ARTIFACT_ROOT}/yield-prediction-xgboost",
+        )
     mlflow.set_experiment("yield-prediction-xgboost")
 
-    conn = psycopg2.connect(DATABASE_URL)
-    df = load_dataset(conn)
-    conn.close()
+    engine = sqlalchemy.create_engine(DATABASE_URL)
+    df = load_dataset(engine)
+    engine.dispose()
 
     if df.empty:
         print("[xgboost] Aucune donnée — lancez simulate_data.py d'abord.")

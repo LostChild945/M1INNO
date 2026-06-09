@@ -11,35 +11,29 @@ Lancement :
   python3 src/ml/train_prophet.py
 """
 import os
-import json
 import warnings
 import numpy as np
 import pandas as pd
-import psycopg2
+import sqlalchemy
 import mlflow
 from prophet import Prophet
 
 warnings.filterwarnings("ignore")
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://agritech:agritech_secret@localhost:5432/agritech",
-)
+DATABASE_URL  = os.getenv("DATABASE_URL", "postgresql://agritech:agritech_secret@localhost:5432/agritech")
 MLFLOW_URI    = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+ARTIFACT_ROOT = os.getenv("MLFLOW_ARTIFACT_ROOT", "/tmp/mlflow-artifacts")
 TRAIN_CUTOFF  = 2013
 TOP_N         = 10
 FORECAST_YEARS = 5
 
 
-def load_series(conn) -> pd.DataFrame:
-    return pd.read_sql(
-        """
-        SELECT area, year, value_tonnes
-        FROM pesticide_use
-        ORDER BY area, year
-        """,
-        conn,
-    )
+def load_series(engine) -> pd.DataFrame:
+    with engine.connect() as conn:
+        return pd.read_sql(
+            sqlalchemy.text("SELECT area, year, value_tonnes FROM pesticide_use ORDER BY area, year"),
+            conn,
+        )
 
 
 def mape(y_true, y_pred) -> float:
@@ -85,12 +79,21 @@ def train_country(df_country: pd.DataFrame):
 
 
 def main():
+    os.makedirs(ARTIFACT_ROOT, exist_ok=True)
     mlflow.set_tracking_uri(MLFLOW_URI)
+
+    client = mlflow.MlflowClient()
+    exp = client.get_experiment_by_name("pesticide-forecast-prophet")
+    if exp is None:
+        client.create_experiment(
+            "pesticide-forecast-prophet",
+            artifact_location=f"file://{ARTIFACT_ROOT}/pesticide-forecast-prophet",
+        )
     mlflow.set_experiment("pesticide-forecast-prophet")
 
-    conn = psycopg2.connect(DATABASE_URL)
-    df = load_series(conn)
-    conn.close()
+    engine = sqlalchemy.create_engine(DATABASE_URL)
+    df = load_series(engine)
+    engine.dispose()
 
     # Top N pays par volume total
     top_countries = (
@@ -121,9 +124,10 @@ def main():
                     mape_score,
                 )
 
-            mlflow.prophet.log_model(
-                model,
-                artifact_path=f"models/{country.replace(' ', '_').replace(',', '')}",
+            country_key = country.replace(' ', '_').replace(',', '').replace('/', '_')
+            mlflow.log_dict(
+                forecast.to_dict(orient="records"),
+                f"forecasts/{country_key}.json",
             )
             print(f"[prophet] {country:<35} MAPE={mape_score}%")
 

@@ -76,7 +76,7 @@ def simulate_yield(crop, pesticide_norm, soil_ph, soil_moisture,
     climate_effect = base * (-0.008 * temp_dev**2 - 0.000008 * rain_dev**2 + 0.05)
     noise        = np.random.normal(0, 0.12 * base)
 
-    return round(max(0.1, base + pest_effect + soil_effect + climate_effect + noise), 3)
+    return float(round(max(0.1, base + pest_effect + soil_effect + climate_effect + noise), 3))
 
 
 def main():
@@ -127,13 +127,9 @@ def main():
     """)
     pest_lookup = {(r[0], r[1]): r[2] for r in cur.fetchall()}
 
-    for idx, (parcel_id, (country, (_, _, avg_temp, avg_rain), crop)) in enumerate(
-        zip(parcel_ids, [
-            (c, (COUNTRY_PROFILES[c], crop))
-            for c in COUNTRY_PROFILES
-            for crop in [p[1] for p in parcels if p[6] == c]
-        ])
-    ):
+    for parcel_id, parcel_row in zip(parcel_ids, parcels):
+        _, crop, _, _, _, _, country = parcel_row
+        _, _, avg_temp, avg_rain = COUNTRY_PROFILES[country]
         for year in YEARS:
             pest_norm = pest_lookup.get((country, year), 0.3)
 

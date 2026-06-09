@@ -142,6 +142,7 @@ services:
       mlflow server
       --backend-store-uri postgresql+psycopg2://mlflow:mlflow_secret@postgres-mlflow:5432/mlflow
       --default-artifact-root /mlflow/artifacts
+      --serve-artifacts
       --host 0.0.0.0
       --port 5000
     ports:
