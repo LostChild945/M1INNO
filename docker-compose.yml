@@ -143,7 +143,7 @@ services:
     volumes:
       - mlflow-artifacts:/mlflow/artifacts
     depends_on:
-      postgres-8mlflow:
+      postgres-mlflow:
         condition: service_healthy
     networks:
       - agritech-net
