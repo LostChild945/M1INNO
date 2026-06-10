@@ -283,7 +283,10 @@ def pesticide_forecast(country: str):
         max_results=1,
     )
     if not runs:
-        raise HTTPException(status_code=404, detail="No Prophet experiment found in MLflow")
+        raise HTTPException(
+            status_code=404,
+            detail="No Prophet run found. Run train_prophet.py first (inside Docker or via Airflow DAG).",
+        )
 
     run_id = runs[0].info.run_id
     country_key = country.replace(" ", "_").replace(",", "").replace("/", "_")
