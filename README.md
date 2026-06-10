@@ -11,7 +11,7 @@ Projet de precision agriculture combinant traitement Big Data Spark, IoT simulé
 | Traitement Big Data | PySpark 3.5, Parquet |
 | Orchestration | Apache Airflow 2.9 |
 | Stockage | PostgreSQL 16 |
-| Machine Learning | XGBoost, Prophet, MLflow |
+| Machine Learning | XGBoost 2.0, Prophet 1.1, MLflow 3.1 |
 | API | FastAPI |
 | Dashboard | Streamlit, Folium |
 | Infrastructure | Docker Compose |
@@ -148,6 +148,19 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 
 ---
 
+## Dashboard Streamlit
+
+Le dashboard est accessible sur http://localhost:8501. Il consomme l'API FastAPI et présente quatre pages :
+
+| Page | Description |
+|---|---|
+| **Carte des parcelles** | Carte Folium mondiale avec markers colorés par type de culture, répartition en camembert |
+| **Prédiction de rendement** | Formulaire capteurs → appel POST /predict/yield → affichage rendement + irrigation recommandée |
+| **Historique** | Tableau des prédictions + boxplot par culture + rendement moyen par pays |
+| **Pesticides** | Série historique FAO + moyenne mobile 5 ans + overlay forecast Prophet 2017-2021 avec intervalles de confiance |
+
+---
+
 ## Schéma PostgreSQL
 
 | Table | Description |
@@ -169,7 +182,7 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 - [ ] Simulation IoT (capteurs sol, météo, NDVI)
 - [ ] Modèles ML — XGBoost (prédiction rendement) + Prophet (forecast)
 - [ ] API FastAPI — endpoints prédiction
-- [ ] Dashboard Streamlit + Folium
+- [x] Dashboard Streamlit + Folium (4 pages : carte, prédiction, historique, pesticides)
 
 ---
 
