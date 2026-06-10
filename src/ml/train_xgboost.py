@@ -92,16 +92,17 @@ def build_features(df: pd.DataFrame):
 
 
 def main():
-    os.makedirs(ARTIFACT_ROOT, exist_ok=True)
     mlflow.set_tracking_uri(MLFLOW_URI)
 
     client = mlflow.MlflowClient()
     exp = client.get_experiment_by_name("yield-prediction-xgboost")
     if exp is None:
-        client.create_experiment(
-            "yield-prediction-xgboost",
-            artifact_location=f"file://{ARTIFACT_ROOT}/yield-prediction-xgboost",
-        )
+        # Sans artifact_location : utilise l'artifact root du serveur MLflow (volume Docker)
+        kwargs = {}
+        if ARTIFACT_ROOT:
+            os.makedirs(ARTIFACT_ROOT, exist_ok=True)
+            kwargs["artifact_location"] = f"file://{ARTIFACT_ROOT}/yield-prediction-xgboost"
+        client.create_experiment("yield-prediction-xgboost", **kwargs)
     mlflow.set_experiment("yield-prediction-xgboost")
 
     engine = sqlalchemy.create_engine(DATABASE_URL)

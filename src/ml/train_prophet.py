@@ -79,16 +79,16 @@ def train_country(df_country: pd.DataFrame):
 
 
 def main():
-    os.makedirs(ARTIFACT_ROOT, exist_ok=True)
     mlflow.set_tracking_uri(MLFLOW_URI)
 
     client = mlflow.MlflowClient()
     exp = client.get_experiment_by_name("pesticide-forecast-prophet")
     if exp is None:
-        client.create_experiment(
-            "pesticide-forecast-prophet",
-            artifact_location=f"file://{ARTIFACT_ROOT}/pesticide-forecast-prophet",
-        )
+        kwargs = {}
+        if ARTIFACT_ROOT:
+            os.makedirs(ARTIFACT_ROOT, exist_ok=True)
+            kwargs["artifact_location"] = f"file://{ARTIFACT_ROOT}/pesticide-forecast-prophet"
+        client.create_experiment("pesticide-forecast-prophet", **kwargs)
     mlflow.set_experiment("pesticide-forecast-prophet")
 
     engine = sqlalchemy.create_engine(DATABASE_URL)
