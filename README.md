@@ -11,7 +11,7 @@ Projet de precision agriculture combinant traitement Big Data Spark, IoT simulé
 | Traitement Big Data | PySpark 3.5, Parquet |
 | Orchestration | Apache Airflow 2.9 |
 | Stockage | PostgreSQL 16 |
-| Machine Learning | XGBoost, Prophet, MLflow |
+| Machine Learning | XGBoost 2.0, Prophet 1.1, MLflow 3.1 |
 | API | FastAPI |
 | Dashboard | Streamlit, Folium |
 | Infrastructure | Docker Compose |
@@ -161,13 +161,70 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 
 ---
 
+## Pipeline ML
+
+### Variables d'environnement
+
+| Variable | Par défaut | Description |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://agritech:agritech_secret@localhost:5432/agritech` | Connexion PostgreSQL |
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | URL du serveur MLflow |
+| `MLFLOW_ARTIFACT_ROOT` | `/tmp/mlflow-artifacts` | Dossier local pour les artifacts MLflow |
+
+### Lancer le pipeline ML manuellement
+
+> Prérequis : la stack Docker doit être démarrée (`docker compose up -d`).
+
+```bash
+# 1. Générer les données simulées (60 parcelles, 2010–2016)
+python3 src/ml/simulate_data.py
+
+# 2a. Entraîner le modèle XGBoost (prédiction de rendement)
+python3 src/ml/train_xgboost.py
+
+# 2b. Entraîner les modèles Prophet (forecast pesticides)
+python3 src/ml/train_prophet.py
+```
+
+Les étapes 2a et 2b sont indépendantes et peuvent être lancées en parallèle.
+
+### Résultats
+
+**XGBoost — prédiction de rendement (t/ha)**
+
+| Métrique | Valeur |
+|---|---|
+| RMSE (test) | 0.6606 |
+| MAE (test) | 0.4775 |
+| R² (test) | 0.8643 |
+| CV RMSE (5-fold) | ~0.67 |
+
+Features les plus importantes : `value_tonnes`, `year`, `soil_ph` (voir `feature_importances.json` dans MLflow).
+
+**Prophet — forecast utilisation pesticides (2017–2021)**
+
+| Métrique | Valeur |
+|---|---|
+| MAPE moyen (top 10 pays) | 14.87 % |
+| Horizon de prévision | 5 ans (2017–2021) |
+| Données d'entraînement | 1990–2013 |
+| Évaluation | 2014–2016 |
+
+Les prédictions par pays sont accessibles dans MLflow sous forme de fichiers JSON (`forecasts/<pays>.json`).
+
+### Via Airflow
+
+Le DAG `ml_pipeline` orchestre les trois scripts avec une planification hebdomadaire (simulate → train_xgboost + train_prophet en parallèle). Il est accessible depuis l'interface Airflow sur http://localhost:8081.
+
+---
+
 ## État d'avancement
 
 - [x] Infrastructure Docker (Spark, Airflow, PostgreSQL, MLflow, FastAPI, Streamlit)
 - [x] Pipeline ingestion données FAO Pesticides (CSV → Parquet → PostgreSQL)
 - [x] Feature engineering Spark (YoY, MA5, CAGR, normalisation)
-- [ ] Simulation IoT (capteurs sol, météo, NDVI)
-- [ ] Modèles ML — XGBoost (prédiction rendement) + Prophet (forecast)
+- [x] Simulation IoT (60 parcelles, 20 pays, capteurs sol/météo, 2010–2016)
+- [x] Modèles ML — XGBoost (R²=0.86) + Prophet (MAPE=14.87 %)
 - [ ] API FastAPI — endpoints prédiction
 - [ ] Dashboard Streamlit + Folium
 
@@ -178,6 +235,11 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 Les migrations sont dans `infra/postgres/migrations/`. Pour appliquer une migration sur un conteneur en cours :
 
 ```bash
+# Migration 001 — table pesticide_use
 docker cp infra/postgres/migrations/001_add_pesticide_use.sql agritech-postgres:/tmp/
 docker exec agritech-postgres psql -U agritech -d agritech -f /tmp/001_add_pesticide_use.sql
+
+# Migration 002 — colonne country dans parcels
+docker cp infra/postgres/migrations/002_add_country_to_parcels.sql agritech-postgres:/tmp/
+docker exec agritech-postgres psql -U agritech -d agritech -f /tmp/002_add_country_to_parcels.sql
 ```
