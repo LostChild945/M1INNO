@@ -21,7 +21,7 @@ import mlflow.xgboost
 import pandas as pd
 import sqlalchemy
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sklearn.preprocessing import LabelEncoder
 
 DATABASE_URL       = os.getenv("DATABASE_URL", "postgresql://agritech:agritech_secret@postgres:5432/agritech")
@@ -100,6 +100,8 @@ class YieldPredictionRequest(BaseModel):
 
 
 class YieldPredictionResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     parcel_id:         int
     predicted_yield:   float
     irrigation_rec_mm: float
@@ -271,8 +273,12 @@ def pesticide_forecast(country: str):
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = mlflow.MlflowClient()
 
+    exp = client.get_experiment_by_name("pesticide-forecast-prophet")
+    if exp is None:
+        raise HTTPException(status_code=404, detail="No Prophet experiment found in MLflow")
+
     runs = client.search_runs(
-        experiment_names=["pesticide-forecast-prophet"],
+        experiment_ids=[exp.experiment_id],
         order_by=["start_time DESC"],
         max_results=1,
     )
