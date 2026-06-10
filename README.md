@@ -148,6 +148,58 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 
 ---
 
+## API FastAPI
+
+L'API expose les prédictions du modèle XGBoost et les données pesticides. La documentation interactive Swagger est disponible sur http://localhost:8000/docs.
+
+### Endpoints
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/health` | Statut du service et du modèle chargé |
+| GET | `/parcels` | Liste de toutes les parcelles |
+| GET | `/parcels/{id}` | Détail d'une parcelle |
+| POST | `/predict/yield` | Prédiction de rendement + recommandation d'irrigation |
+| GET | `/predictions` | Historique des prédictions (paramètre `?limit=50`) |
+| GET | `/pesticide/countries` | Liste des pays disponibles dans la base |
+| GET | `/pesticide/history/{country}` | Série historique FAO pour un pays |
+| GET | `/pesticide/forecast/{country}` | Forecast Prophet 2017-2021 depuis MLflow |
+
+### Exemple — POST /predict/yield
+
+```bash
+curl -X POST http://localhost:8000/predict/yield \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parcel_id": 1,
+    "crop_type": "wheat",
+    "year": 2015,
+    "soil_moisture": 42.0,
+    "soil_ph": 6.8,
+    "nitrogen_ppm": 55.0,
+    "air_temp_c": 14.0,
+    "humidity_pct": 65.0,
+    "rainfall_mm": 320.0,
+    "solar_rad_wm2": 180.0,
+    "country": "France"
+  }'
+```
+
+Réponse :
+```json
+{
+  "parcel_id": 1,
+  "predicted_yield": 3.842,
+  "irrigation_rec_mm": 180.0,
+  "model_name": "yield-xgboost",
+  "model_version": "1"
+}
+```
+
+Les types de culture acceptés : `corn`, `rice`, `soybean`, `sunflower`, `wheat`.
+
+---
+
 ## Schéma PostgreSQL
 
 | Table | Description |
