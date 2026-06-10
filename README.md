@@ -278,7 +278,7 @@ Le DAG `ml_pipeline` orchestre les trois scripts avec une planification hebdomad
 - [x] Simulation IoT (60 parcelles, 20 pays, capteurs sol/météo, 2010–2016)
 - [x] Modèles ML — XGBoost (R²=0.86) + Prophet (MAPE=14.87 %)
 - [ ] API FastAPI — endpoints prédiction
-- [ ] Dashboard Streamlit + Folium
+- [x] Dashboard Streamlit + Folium (4 pages : carte, prédiction, historique, pesticides)
 
 ---
 
