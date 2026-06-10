@@ -11,7 +11,7 @@ Projet de precision agriculture combinant traitement Big Data Spark, IoT simulé
 | Traitement Big Data | PySpark 3.5, Parquet |
 | Orchestration | Apache Airflow 2.9 |
 | Stockage | PostgreSQL 16 |
-| Machine Learning | XGBoost, Prophet, MLflow |
+| Machine Learning | XGBoost 2.0, Prophet 1.1, MLflow 3.1 |
 | API | FastAPI |
 | Dashboard | Streamlit, Folium |
 | Infrastructure | Docker Compose |
@@ -148,6 +148,58 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 
 ---
 
+## API FastAPI
+
+L'API expose les prédictions du modèle XGBoost et les données pesticides. La documentation interactive Swagger est disponible sur http://localhost:8000/docs.
+
+### Endpoints
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/health` | Statut du service et du modèle chargé |
+| GET | `/parcels` | Liste de toutes les parcelles |
+| GET | `/parcels/{id}` | Détail d'une parcelle |
+| POST | `/predict/yield` | Prédiction de rendement + recommandation d'irrigation |
+| GET | `/predictions` | Historique des prédictions (paramètre `?limit=50`) |
+| GET | `/pesticide/countries` | Liste des pays disponibles dans la base |
+| GET | `/pesticide/history/{country}` | Série historique FAO pour un pays |
+| GET | `/pesticide/forecast/{country}` | Forecast Prophet 2017-2021 depuis MLflow |
+
+### Exemple — POST /predict/yield
+
+```bash
+curl -X POST http://localhost:8000/predict/yield \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parcel_id": 1,
+    "crop_type": "wheat",
+    "year": 2015,
+    "soil_moisture": 42.0,
+    "soil_ph": 6.8,
+    "nitrogen_ppm": 55.0,
+    "air_temp_c": 14.0,
+    "humidity_pct": 65.0,
+    "rainfall_mm": 320.0,
+    "solar_rad_wm2": 180.0,
+    "country": "France"
+  }'
+```
+
+Réponse :
+```json
+{
+  "parcel_id": 1,
+  "predicted_yield": 3.842,
+  "irrigation_rec_mm": 180.0,
+  "model_name": "yield-xgboost",
+  "model_version": "1"
+}
+```
+
+Les types de culture acceptés : `corn`, `rice`, `soybean`, `sunflower`, `wheat`.
+
+---
+
 ## Schéma PostgreSQL
 
 | Table | Description |
@@ -168,7 +220,7 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 - [x] Feature engineering Spark (YoY, MA5, CAGR, normalisation)
 - [ ] Simulation IoT (capteurs sol, météo, NDVI)
 - [ ] Modèles ML — XGBoost (prédiction rendement) + Prophet (forecast)
-- [ ] API FastAPI — endpoints prédiction
+- [x] API FastAPI — 8 endpoints prédiction + pesticides
 - [ ] Dashboard Streamlit + Folium
 
 ---
@@ -178,6 +230,11 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 Les migrations sont dans `infra/postgres/migrations/`. Pour appliquer une migration sur un conteneur en cours :
 
 ```bash
+# Migration 001 — table pesticide_use
 docker cp infra/postgres/migrations/001_add_pesticide_use.sql agritech-postgres:/tmp/
 docker exec agritech-postgres psql -U agritech -d agritech -f /tmp/001_add_pesticide_use.sql
+
+# Migration 002 — colonne country dans parcels
+docker cp infra/postgres/migrations/002_add_country_to_parcels.sql agritech-postgres:/tmp/
+docker exec agritech-postgres psql -U agritech -d agritech -f /tmp/002_add_country_to_parcels.sql
 ```
