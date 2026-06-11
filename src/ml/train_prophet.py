@@ -112,7 +112,7 @@ def main():
 
         for country in top_countries:
             df_c = df[df["area"] == country].copy()
-            model, forecast, mape_score = train_country(df_c)
+            _, forecast, mape_score = train_country(df_c)
 
             forecast["area"] = country
             all_forecasts.append(forecast)
