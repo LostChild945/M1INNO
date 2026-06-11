@@ -1,6 +1,6 @@
 # AgriTech — Analytics Agricole & Prédiction de Rendement
 
-Projet de precision agriculture combinant traitement Big Data Spark, IoT simulé et Machine Learning pour prédire les rendements et optimiser l'irrigation.
+Plateforme MLOps de precision agriculture combinant traitement Big Data Spark, IoT simulé et Machine Learning pour prédire les rendements agricoles et optimiser l'irrigation.
 
 ---
 
@@ -12,8 +12,8 @@ Projet de precision agriculture combinant traitement Big Data Spark, IoT simulé
 | Orchestration | Apache Airflow 2.9 |
 | Stockage | PostgreSQL 16 |
 | Machine Learning | XGBoost 2.0, Prophet 1.1, MLflow 3.1 |
-| API | FastAPI |
-| Dashboard | Streamlit, Folium |
+| API | FastAPI 0.111 |
+| Dashboard | Streamlit 1.36, Folium, Plotly |
 | Infrastructure | Docker Compose |
 
 **Ressources cibles :** 8 cores CPU · 15-16 GB RAM · 60 GB stockage
@@ -34,8 +34,9 @@ données brutes (CSV / IoT)
   (Parquet brut → features → PostgreSQL via JDBC)
         │
         ▼
+  Simulation IoT (60 parcelles × 7 ans)
   ML — XGBoost (rendement) + Prophet (séries temporelles)
-  MLflow (tracking expériences)
+  MLflow (tracking expériences + model registry)
         │
         ▼
   FastAPI (endpoints prédiction)
@@ -148,6 +149,63 @@ Le DAG `pesticides_pipeline` orchestre les deux étapes ci-dessus avec une plani
 
 ---
 
+## Pipeline ML
+
+### Variables d'environnement
+
+| Variable | Par défaut | Description |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://agritech:agritech_secret@localhost:5432/agritech` | Connexion PostgreSQL |
+| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | URL du serveur MLflow |
+| `MLFLOW_ARTIFACT_ROOT` | *(non défini)* | Si défini, utilise ce chemin local pour les artifacts (dev uniquement) |
+
+### Lancer le pipeline ML manuellement
+
+> Prérequis : la stack Docker doit être démarrée (`docker compose up -d`).
+
+```bash
+# 1. Générer les données simulées (60 parcelles, 2010–2016)
+python3 src/ml/simulate_data.py
+
+# 2a. Entraîner le modèle XGBoost (prédiction de rendement)
+python3 src/ml/train_xgboost.py
+
+# 2b. Entraîner les modèles Prophet (forecast pesticides)
+python3 src/ml/train_prophet.py
+```
+
+Les étapes 2a et 2b sont indépendantes et peuvent être lancées en parallèle.
+
+> **Note Docker** : pour que les artifacts MLflow soient accessibles depuis les containers, lancer les scripts depuis l'intérieur d'un container avec `MLFLOW_TRACKING_URI=http://mlflow:5000` et sans définir `MLFLOW_ARTIFACT_ROOT`.
+
+### Résultats
+
+**XGBoost — prédiction de rendement (t/ha)**
+
+| Métrique | Valeur |
+|---|---|
+| RMSE (test) | 0.6606 |
+| MAE (test) | 0.4775 |
+| R² (test) | 0.8643 |
+| CV RMSE (5-fold) | ~0.67 |
+
+Features les plus importantes : `crop_encoded`, `air_temp_c`, `rainfall_mm`.
+
+**Prophet — forecast utilisation pesticides (2017–2021)**
+
+| Métrique | Valeur |
+|---|---|
+| MAPE moyen (top 10 pays) | 14.87 % |
+| Horizon de prévision | 5 ans (2017–2021) |
+| Données d'entraînement | 1990–2013 |
+| Évaluation | 2014–2016 |
+
+### Via Airflow
+
+Le DAG `ml_pipeline` orchestre les trois scripts avec une planification hebdomadaire (simulate → train_xgboost + train_prophet en parallèle). Il est accessible depuis l'interface Airflow sur http://localhost:8081.
+
+---
+
 ## API FastAPI
 
 L'API expose les prédictions du modèle XGBoost et les données pesticides. La documentation interactive Swagger est disponible sur http://localhost:8000/docs.
@@ -189,14 +247,27 @@ Réponse :
 ```json
 {
   "parcel_id": 1,
-  "predicted_yield": 3.842,
+  "predicted_yield": 3.434,
   "irrigation_rec_mm": 180.0,
   "model_name": "yield-xgboost",
   "model_version": "1"
 }
 ```
 
-Les types de culture acceptés : `corn`, `rice`, `soybean`, `sunflower`, `wheat`.
+Types de culture acceptés : `corn`, `rice`, `soybean`, `sunflower`, `wheat`.
+
+---
+
+## Dashboard Streamlit
+
+Le dashboard est accessible sur http://localhost:8501. Il consomme l'API FastAPI et présente quatre pages :
+
+| Page | Description |
+|---|---|
+| **Carte des parcelles** | Carte Folium mondiale avec markers colorés par type de culture, répartition en camembert |
+| **Prédiction de rendement** | Formulaire capteurs → appel POST /predict/yield → affichage rendement + irrigation recommandée |
+| **Historique** | Tableau des prédictions + boxplot par culture + rendement moyen par pays |
+| **Pesticides** | Série historique FAO + moyenne mobile 5 ans + overlay forecast Prophet 2017-2021 avec intervalles de confiance |
 
 ---
 
@@ -204,69 +275,12 @@ Les types de culture acceptés : `corn`, `rice`, `soybean`, `sunflower`, `wheat`
 
 | Table | Description |
 |---|---|
-| `parcels` | Parcelles agricoles (localisation, culture, surface) |
+| `parcels` | Parcelles agricoles (localisation, culture, surface, pays) |
 | `sensor_readings` | Relevés capteurs IoT (humidité, température, pH…) |
 | `ndvi_observations` | Indice de végétation NDVI par parcelle et par date |
 | `yield_records` | Rendements réels historiques (t/ha) |
 | `pesticide_use` | Utilisation pesticides FAO avec features calculées |
 | `ml_predictions` | Prédictions ML (rendement, irrigation recommandée) |
-
----
-
-## Pipeline ML
-
-### Variables d'environnement
-
-| Variable | Par défaut | Description |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://agritech:agritech_secret@localhost:5432/agritech` | Connexion PostgreSQL |
-| `MLFLOW_TRACKING_URI` | `http://localhost:5000` | URL du serveur MLflow |
-| `MLFLOW_ARTIFACT_ROOT` | `/tmp/mlflow-artifacts` | Dossier local pour les artifacts MLflow |
-
-### Lancer le pipeline ML manuellement
-
-> Prérequis : la stack Docker doit être démarrée (`docker compose up -d`).
-
-```bash
-# 1. Générer les données simulées (60 parcelles, 2010–2016)
-python3 src/ml/simulate_data.py
-
-# 2a. Entraîner le modèle XGBoost (prédiction de rendement)
-python3 src/ml/train_xgboost.py
-
-# 2b. Entraîner les modèles Prophet (forecast pesticides)
-python3 src/ml/train_prophet.py
-```
-
-Les étapes 2a et 2b sont indépendantes et peuvent être lancées en parallèle.
-
-### Résultats
-
-**XGBoost — prédiction de rendement (t/ha)**
-
-| Métrique | Valeur |
-|---|---|
-| RMSE (test) | 0.6606 |
-| MAE (test) | 0.4775 |
-| R² (test) | 0.8643 |
-| CV RMSE (5-fold) | ~0.67 |
-
-Features les plus importantes : `value_tonnes`, `year`, `soil_ph` (voir `feature_importances.json` dans MLflow).
-
-**Prophet — forecast utilisation pesticides (2017–2021)**
-
-| Métrique | Valeur |
-|---|---|
-| MAPE moyen (top 10 pays) | 14.87 % |
-| Horizon de prévision | 5 ans (2017–2021) |
-| Données d'entraînement | 1990–2013 |
-| Évaluation | 2014–2016 |
-
-Les prédictions par pays sont accessibles dans MLflow sous forme de fichiers JSON (`forecasts/<pays>.json`).
-
-### Via Airflow
-
-Le DAG `ml_pipeline` orchestre les trois scripts avec une planification hebdomadaire (simulate → train_xgboost + train_prophet en parallèle). Il est accessible depuis l'interface Airflow sur http://localhost:8081.
 
 ---
 
@@ -277,7 +291,7 @@ Le DAG `ml_pipeline` orchestre les trois scripts avec une planification hebdomad
 - [x] Feature engineering Spark (YoY, MA5, CAGR, normalisation)
 - [x] Simulation IoT (60 parcelles, 20 pays, capteurs sol/météo, 2010–2016)
 - [x] Modèles ML — XGBoost (R²=0.86) + Prophet (MAPE=14.87 %)
-- [ ] API FastAPI — endpoints prédiction
+- [x] API FastAPI — 8 endpoints prédiction + pesticides
 - [x] Dashboard Streamlit + Folium (4 pages : carte, prédiction, historique, pesticides)
 
 ---
