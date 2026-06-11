@@ -62,27 +62,52 @@ données brutes (CSV / IoT)
 
 ---
 
-## Lancement rapide
+## Lancement complet (de zéro)
 
 ### Prérequis
 
 - Docker 24+ et Docker Compose v2
+- `make` installé (optionnel — un script bash est fourni en alternative)
 - 16 GB RAM minimum alloués à Docker
 
-### Démarrage
+### Option A — avec Make (recommandé)
 
 ```bash
-# 1. Copier les variables d'environnement
 cp .env.example .env
-
-# 2. Lancer la stack complète
-docker compose up -d --build
-
-# 3. Vérifier que tous les services sont up
-docker compose ps
+make setup
 ```
 
-L'initialisation d'Airflow (migration DB + création user admin) se fait automatiquement au premier démarrage via le service `airflow-init`.
+`make setup` enchaîne automatiquement : démarrage des services → pipeline Spark (pesticides) → pipeline ML (simulation + XGBoost + Prophet). Compter **5-10 minutes** au premier lancement (compilation CmdStan pour Prophet).
+
+### Option B — script bash
+
+```bash
+cp .env.example .env
+bash scripts/setup.sh
+```
+
+### Résultat attendu
+
+| Service | URL |
+|---|---|
+| API (Swagger) | http://localhost:8000/docs |
+| Dashboard | http://localhost:8501 |
+| MLflow | http://localhost:5000 |
+| Airflow | http://localhost:8081 — admin / admin |
+| Spark UI | http://localhost:8080 |
+
+### Autres commandes Make
+
+```bash
+make start     # Démarre uniquement les services Docker
+make pipeline  # Relance le pipeline Spark (données pesticides)
+make ml        # Relance l'entraînement ML
+make stop      # Arrête les services (données conservées)
+make reset     # Reset complet — supprime services ET volumes
+make logs      # Logs en temps réel
+```
+
+> **Note :** Le service `ml-runner` utilise le profil Docker Compose `ml` — il ne démarre pas avec `docker compose up -d` seul et ne tourne que le temps du pipeline ML.
 
 ---
 
