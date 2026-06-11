@@ -267,6 +267,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritech}:${POSTGRES_PASSWORD:-agritech_secret}@postgres:5432/${POSTGRES_DB:-agritech}
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      GIT_PYTHON_REFRESH: quiet
     volumes:
       - ./src:/app/src
     depends_on:
