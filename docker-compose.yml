@@ -256,6 +256,30 @@ services:
       - agritech-net
     restart: unless-stopped
 
+  # ─────────────────────────────────────────────
+  # ML Runner — pipeline d'entraînement (one-shot)
+  # ─────────────────────────────────────────────
+  ml-runner:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.ml
+    container_name: agritech-ml-runner
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritech}:${POSTGRES_PASSWORD:-agritech_secret}@postgres:5432/${POSTGRES_DB:-agritech}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    networks:
+      - agritech-net
+    profiles:
+      - ml
+    restart: "no"
+
 # ─────────────────────────────────────────────
 # Volumes persistants
 # ─────────────────────────────────────────────
