@@ -80,7 +80,9 @@ def simulate_yield(crop, pesticide_norm, soil_ph, soil_moisture,
 
 
 def main():
-    conn = psycopg2.connect(DATABASE_URL)
+    # psycopg2 doesn't accept the SQLAlchemy dialect prefix (postgresql+psycopg2://)
+    dsn = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql://")
+    conn = psycopg2.connect(dsn)
     cur = conn.cursor()
 
     # Vérifie si la simulation a déjà été lancée
