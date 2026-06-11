@@ -41,7 +41,7 @@ pipeline:
 # Pipeline ML : simulation IoT + entraînement XGBoost + Prophet
 ml:
 	@echo "ML — Simulation + Entraînement (peut prendre plusieurs minutes)..."
-	docker compose --profile ml run --rm ml-runner
+	docker compose --profile ml run --rm --build ml-runner
 
 # Arrête tous les services (données conservées)
 stop:
