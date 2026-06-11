@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: AgriTech
+    orgId: 1
+    folder: AgriTech
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

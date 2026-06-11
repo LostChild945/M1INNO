@@ -13,6 +13,7 @@ Endpoints :
 """
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -21,8 +22,29 @@ import mlflow.xgboost
 import pandas as pd
 import sqlalchemy
 from fastapi import FastAPI, HTTPException, Query
+from prometheus_client import Counter, Histogram
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, ConfigDict
 from sklearn.preprocessing import LabelEncoder
+
+# ── Métriques Prometheus personnalisées ─────────────────────────────────────
+
+PREDICTION_REQUESTS = Counter(
+    "agritech_predictions_total",
+    "Nombre total de prédictions de rendement",
+    ["crop_type"],
+)
+
+PREDICTION_LATENCY = Histogram(
+    "agritech_prediction_duration_seconds",
+    "Durée de l'inférence XGBoost (hors réseau et DB)",
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5],
+)
+
+MODEL_ERRORS = Counter(
+    "agritech_model_errors_total",
+    "Erreurs de chargement ou d'inférence du modèle ML",
+)
 
 DATABASE_URL       = os.getenv("DATABASE_URL", "postgresql://agritech:agritech_secret@postgres:5432/agritech")
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
@@ -61,7 +83,8 @@ def _load_model():
             _model_version = versions[0].version
         return _model
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Model not available: {exc}")
+        MODEL_ERRORS.inc()
+        raise HTTPException(status_code=503, detail=f"Model not available: {exc}") from exc
 
 
 @asynccontextmanager
@@ -81,6 +104,9 @@ app = FastAPI(
     description="API de prédiction de rendement agricole et forecast pesticides",
     lifespan=lifespan,
 )
+
+# Instrumentation HTTP automatique : durée requête, nb requêtes, codes statut
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 # ── Pydantic schemas ─────────────────────────────────────────────────────────
@@ -190,7 +216,10 @@ def predict_yield(req: YieldPredictionRequest):
         "value_normalized": value_normalized,
     }])
 
+    t0 = time.perf_counter()
     predicted_yield = round(max(0.0, float(model.predict(features)[0])), 3)
+    PREDICTION_LATENCY.observe(time.perf_counter() - t0)
+    PREDICTION_REQUESTS.labels(crop_type=req.crop_type).inc()
 
     water_target      = CROP_WATER_NEEDS.get(req.crop_type, 600)
     irrigation_rec_mm = round(max(0.0, water_target - req.rainfall_mm), 1)
