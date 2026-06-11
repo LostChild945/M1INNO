@@ -61,7 +61,7 @@ def _load_model():
             _model_version = versions[0].version
         return _model
     except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Model not available: {exc}")
+        raise HTTPException(status_code=503, detail=f"Model not available: {exc}") from exc
 
 
 @asynccontextmanager
@@ -293,12 +293,12 @@ def pesticide_forecast(country: str):
 
     try:
         local_path = client.download_artifacts(run_id, f"forecasts/{country_key}.json")
-        with open(local_path) as f:
+        with open(local_path, encoding="utf-8") as f:
             data = json.load(f)
         return {"country": country, "forecast": data}
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=404,
             detail=f"No forecast artifact for country '{country}'. "
                    "Run train_prophet.py first and ensure the country is in the top 10.",
-        )
+        ) from exc

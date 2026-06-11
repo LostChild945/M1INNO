@@ -1,0 +1,39 @@
+name: lint
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+jobs:
+  pylint:
+    name: Pylint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install pylint
+          pip install -r src/api/requirements.txt
+          pip install -r src/dashboard/requirements.txt
+          pip install -r src/ml/requirements.txt
+
+      - name: Run Pylint
+        run: |
+          python -m pylint src/ \
+            --rcfile=.pylintrc \
+            --fail-under=8.0

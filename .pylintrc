@@ -1,0 +1,58 @@
+[MASTER]
+# Modules avec dépendances C/JVM non disponibles en CI (pyspark, prophet/CmdStan)
+ignored-modules=pyspark,py4j,pyspark.sql,pyspark.sql.functions,pyspark.sql.window
+
+# Nb de jobs pylint (0 = auto)
+jobs=1
+
+[MESSAGES CONTROL]
+disable=
+    # Nommage court courant en ML/data science (X, y, df, le, r2...)
+    C0103,
+    # Docstrings non obligatoires sur ce projet
+    C0114,
+    C0115,
+    C0116,
+    # Imports conditionnels / ordre non alphabétique toléré
+    C0412,
+    C0413,
+    # Duplication de code acceptable dans les scripts ML indépendants
+    R0801,
+    # Classes de schéma Pydantic avec peu de méthodes publiques
+    R0903,
+    # Fonctions ML avec beaucoup d'arguments (simulate_yield, build_features...)
+    R0912,
+    R0913,
+    R0914,
+    # global statement intentionnel dans _load_model() (singleton FastAPI)
+    W0603,
+    # Broad except intentionnel dans le lifespan FastAPI
+    W0703,
+    # f-string dans les logs
+    W1203,
+    # ._mapping est l'API publique recommandée pour les Row SQLAlchemy
+    W0212,
+    # paramètre `app` du lifespan FastAPI (convention du framework)
+    W0621,
+    W0613,
+    # dict() vs {} — préférence stylistique, dict() plus lisible avec kwargs
+    R1735,
+
+[FORMAT]
+max-line-length=120
+indent-string='    '
+
+[DESIGN]
+# Pas de seuil strict sur le nombre de méthodes publiques
+min-public-methods=1
+max-args=10
+max-locals=20
+max-branches=15
+
+[REPORTS]
+output-format=colorized
+score=yes
+
+[VARIABLES]
+# Autorise les variables de boucle à usage unique
+dummy-variables-rgx=_$|(_[a-zA-Z0-9_]*[a-zA-Z0-9]+$)|dummy|^ignored_|^unused_
