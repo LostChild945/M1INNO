@@ -267,6 +267,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-agritech}:${POSTGRES_PASSWORD:-agritech_secret}@postgres:5432/${POSTGRES_DB:-agritech}
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      GIT_PYTHON_REFRESH: quiet
     volumes:
       - ./src:/app/src
     depends_on:
@@ -280,6 +281,51 @@ services:
       - ml
     restart: "no"
 
+  # ─────────────────────────────────────────────
+  # Prometheus — collecte de métriques
+  # ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: agritech-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+    depends_on:
+      - api
+    networks:
+      - agritech-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Grafana — visualisation des métriques
+  # ─────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: agritech-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-agritech_grafana}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - agritech-net
+    restart: unless-stopped
+
 # ─────────────────────────────────────────────
 # Volumes persistants
 # ─────────────────────────────────────────────
@@ -290,6 +336,8 @@ volumes:
   mlflow-artifacts:
   airflow-logs:
   airflow-plugins:
+  prometheus-data:
+  grafana-data:
 
 # ─────────────────────────────────────────────
 # Réseau interne
